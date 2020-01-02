@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"github.com/SkyAPM/go2sky"
 	"log"
+	"os"
 	"sync/atomic"
 )
 
@@ -40,6 +41,18 @@ func serviceId(service string) (serviceId int32) {
 		serviceMapping[service] = serviceId
 	}
 	return
+}
+
+func NewMockReporter() mockReporter {
+	return mockReporter{
+		logger: log.New(os.Stderr, "go2sky-test", log.LstdFlags),
+		validateData: validateData{
+			RegistryItem: registryItem{
+				Applications:    make(map[string]int32),
+				InstanceMapping: make(map[string][]int32),
+			},
+		},
+	}
 }
 
 type mockReporter struct {

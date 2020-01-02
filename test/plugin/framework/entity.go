@@ -20,13 +20,13 @@ package framework
 import "github.com/pkg/errors"
 
 type validateData struct {
-	RegistryItem registryItem `json:"registry_item"`
-	SegmentItems segmentItems `json:"segment_items"`
+	RegistryItem registryItem `json:"registryItem"`
+	SegmentItems segmentItems `json:"segmentItems"`
 }
 
 type registryItem struct {
 	Applications    map[string]int32   `json:"applications"`
-	InstanceMapping map[string][]int32 `json:"instance_mapping"`
+	InstanceMapping map[string][]int32 `json:"instances"`
 }
 
 func (r *registryItem) RegistryApplication(applicationCode string, applicationId int32) {
@@ -36,11 +36,13 @@ func (r *registryItem) RegistryApplication(applicationCode string, applicationId
 }
 
 func (r *registryItem) RegistryInstance(applicationId int32, instanceId int32) error {
-	_, err := r.findApplicationCode(applicationId)
+	applicationCode, err := r.findApplicationCode(applicationId)
 	if err != nil {
 		return err
 	}
 
+	instances, _ := r.InstanceMapping[applicationCode]
+	r.InstanceMapping[applicationCode] = append(instances, instanceId)
 	return nil
 }
 
@@ -56,12 +58,54 @@ func (r *registryItem) findApplicationCode(applicationId int32) (string, error) 
 type segmentItems struct {
 }
 
-type Span struct {
-	OperationName string `json:"operation_name"`
-	OperationId   int    `json:"operation_id"`
-	ParentSpanId  int    `json:"parent_span_id"`
-	SpanId        int    `json:"span_id"`
-	SpanLayer     int    `json:"span_layer"`
-	StartTime     int    `json:"start_time"`
-	EndTime       int    `json:"end_time"`
+type segmentItem struct {
+	applicationCode string    `json:"applicationCode"`
+	segments        []segment `json:"segments"`
+}
+
+type segment struct {
+	segmentId string `json:"segmentId"`
+	spans     []span `json:"spans"`
+}
+
+type span struct {
+	OperationName string         `json:"operationName"`
+	OperationId   int            `json:"operationId"`
+	ParentSpanId  int            `json:"parentSpanId"`
+	SpanId        int            `json:"spanId"`
+	SpanLayer     int            `json:"spanLayer"`
+	StartTime     int            `json:"startTime"`
+	EndTime       int            `json:"endTime"`
+	ComponentId   int            `json:"componentId"`
+	ComponentName string         `json:"componentName"`
+	IsError       bool           `json:"isError"`
+	SpanType      string         `json:"spanType"`
+	Peer          string         `json:"Peer"`
+	PeerId        int            `json:"peerId"`
+	Tags          []keyValuePair `json:"tags"`
+	Logs          []logEvent     `json:"logs"`
+	Refs          []segmentRef   `json:"refs"`
+}
+
+type segmentRef struct {
+	ParentEndpointId        int    `json:"parentEndpointId"`
+	ParentEndpoint          string `json:"parentEndpoint"`
+	NetworkAddressId        int    `json:"networkAddressId"`
+	EntryEndpointId         int    `json:"entryEndpointId"`
+	RefType                 string `json:"refType"`
+	ParentSpanId            int    `json:"parentSpanId"`
+	ParentTraceSegmentId    string `json:"parentTraceSegmentId"`
+	ParentServiceInstanceId int    `json:"parentServiceInstanceId"`
+	NetworkAddress          string `json:"networkAddress"`
+	EntryEndpoint           string `json:"entryEndpoint"`
+	EntryServiceInstanceId  int    `json:"entryServiceInstanceId"`
+}
+
+type keyValuePair struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type logEvent struct {
+	LogEvent []keyValuePair `json:"logEvent"`
 }
