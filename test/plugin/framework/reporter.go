@@ -18,7 +18,6 @@
 package framework
 
 import (
-	"encoding/json"
 	"github.com/SkyAPM/go2sky"
 	"log"
 	"os"
@@ -71,14 +70,6 @@ func (mr *mockReporter) Send(spans []go2sky.ReportedSpan) {
 	if spans == nil {
 		return
 	}
-	b, err := json.Marshal(spans)
-	if err != nil {
-		mr.logger.Printf("Error: %s", err)
-		return
-	}
-	root := spans[len(spans)-1]
-	mr.logger.Printf("Segment-%v: %s \n", root.Context().SegmentID, b)
-
 	_ = AddSpans(mr.applicationID, mr.instanceID, spans)
 }
 
