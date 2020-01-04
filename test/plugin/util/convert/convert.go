@@ -19,7 +19,10 @@ package convert
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
+
+	"github.com/SkyAPM/go2sky/reporter/grpc/common"
 )
 
 func GlobalIDConvertString(id []int64) string {
@@ -28,4 +31,28 @@ func GlobalIDConvertString(id []int64) string {
 		ii[i] = fmt.Sprint(v)
 	}
 	return strings.Join(ii, ".")
+}
+
+func RefTypeConvertString(refType common.RefType) string {
+	return common.RefType_name[int32(refType)]
+}
+
+func SpanLayerConvertString(spanLayer common.SpanLayer) string {
+	return common.SpanLayer_name[int32(spanLayer)]
+}
+
+func SpanTypeConvertString(spanType common.SpanType) string {
+	return common.SpanType_name[int32(spanType)]
+}
+
+func Int32ConvertString(value int32) string {
+	return Int64ConvertString(int64(value))
+}
+
+func Int64ConvertString(value int64) string {
+	return strconv.FormatInt(value, 10)
+}
+
+func BoolConvertString(bool2 bool) string {
+	return strconv.FormatBool(bool2)
 }

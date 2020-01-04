@@ -20,17 +20,13 @@ package framework
 import (
 	"context"
 	"fmt"
-	"github.com/SkyAPM/go2sky"
 	"log"
 	"testing"
 	"time"
 )
 
 func TestFramework(t *testing.T) {
-	reporter := NewMockReporter()
-	defer reporter.Close()
-
-	tracer, err := go2sky.NewTracer("test", go2sky.WithReporter(reporter))
+	tracer, err := NewTracer("test")
 	if err != nil {
 		log.Fatalf("create tracer error %v \n", err)
 	}
@@ -45,7 +41,6 @@ func TestFramework(t *testing.T) {
 	span.Tag("kind", "outer")
 	time.Sleep(time.Second)
 	span.End()
-
 	time.Sleep(time.Second)
-	fmt.Printf("%s\n", ReceiveData())
+	fmt.Printf("%s\n", receiveData())
 }
