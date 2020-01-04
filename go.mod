@@ -17,5 +17,5 @@ require (
 	github.com/ugorji/go v1.1.4 // indirect
 	google.golang.org/grpc v1.19.1
 	gopkg.in/go-playground/validator.v8 v8.18.2 // indirect
-	gopkg.in/yaml.v2 v2.2.2 // indirect
+	gopkg.in/yaml.v2 v2.2.2
 )

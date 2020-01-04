@@ -19,50 +19,37 @@ package framework
 
 import (
 	"github.com/SkyAPM/go2sky"
+	"github.com/SkyAPM/go2sky/reporter/grpc/common"
+	"github.com/SkyAPM/go2sky/test/plugin/util/convert"
 	"github.com/pkg/errors"
+
+	yaml "gopkg.in/yaml.v2"
 )
 
 var (
-	ValidateData = newValidateData()
+	ValidateDataInstance = newValidateData()
 )
 
 func newValidateData() validateData {
 	return validateData{
 		RegistryItem: registryItem{
-			Applications:    nil,
-			InstanceMapping: nil,
+			Applications:    make(map[string]int32),
+			InstanceMapping: make(map[string][]int32),
 		},
 		SegmentItems: segmentItems{
-			SegmentItems: nil,
+			SegmentItems: map[string]*segmentItem{},
 		},
 	}
 }
 
 type validateData struct {
-	RegistryItem registryItem `json:"registryItem"`
-	SegmentItems segmentItems `json:"segmentItems"`
+	RegistryItem registryItem `yaml:"registryItem"`
+	SegmentItems segmentItems `yaml:"segmentItems"`
 }
 
 type registryItem struct {
-	Applications    map[string]int32   `json:"applications"`
-	InstanceMapping map[string][]int32 `json:"instances"`
-}
-
-func (r *registryItem) RegistryApplication(applicationCode string, applicationId int32) {
-	if _, ok := r.Applications[applicationCode]; !ok {
-		r.Applications[applicationCode] = applicationId
-	}
-}
-
-func (r *registryItem) RegistryInstance(applicationId int32, instanceId int32) error {
-	applicationCode, err := r.findApplicationCode(applicationId)
-	if err != nil {
-		return err
-	}
-
-	instances, _ := r.InstanceMapping[applicationCode]
-	r.InstanceMapping[applicationCode] = append(instances, instanceId)
-	return nil
+	Applications    map[string]int32   `yaml:"applications"`
+	InstanceMapping map[string][]int32 `yaml:"instances"`
 }
 
 func (r *registryItem) findApplicationCode(applicationId int32) (string, error) {
@@ -75,49 +62,117 @@ func (r *registryItem) findApplicationCode(applicationId int32) (string, error) 
 }
 
 type segmentItems struct {
-	SegmentItems map[string]segmentItem `json:"segmentItems"`
+	SegmentItems map[string]*segmentItem `yaml:"segmentItems"`
 }
 
-func (s *segmentItems) AddSegmentItem(applicationId int32, segment segment) error {
-	applicationCode, err := ValidateData.RegistryItem.findApplicationCode(applicationId)
+func (s *segmentItems) addSegmentItem(applicationId int32, segment segment) error {
+	applicationCode, err := ValidateDataInstance.RegistryItem.findApplicationCode(applicationId)
 	if err != nil {
 		return err
 	}
 	item, ok := s.SegmentItems[applicationCode]
 	if !ok {
-		item = segmentItem{
+		item = &segmentItem{
 			ApplicationCode: applicationCode,
-			Segments:        nil,
 		}
+		s.SegmentItems[applicationCode] = item
 	}
 	item.Segments = append(item.Segments, segment)
 	return nil
 }
 
 type segmentItem struct {
-	ApplicationCode string    `json:"applicationCode"`
-	Segments        []segment `json:"segments"`
+	ApplicationCode string    `yaml:"applicationCode"`
+	Segments        []segment `yaml:"segments"`
 }
 
-func NewSegment(spans []go2sky.ReportedSpan) (segment segment) {
+type segment struct {
+	SegmentID string `yaml:"segmentId"`
+	Spans     []span `yaml:"spans"`
+}
+
+type span struct {
+	OperationName string         `yaml:"operationName"`
+	OperationID   int32          `yaml:"operationId"`
+	ParentSpanID  int32          `yaml:"parentSpanId"`
+	SpanId        int32          `yaml:"spanId"`
+	SpanLayer     string         `yaml:"spanLayer"`
+	StartTime     int64          `yaml:"startTime"`
+	EndTime       int64          `yaml:"endTime"`
+	ComponentID   int32          `yaml:"componentId"`
+	ComponentName string         `yaml:"componentName"`
+	IsError       bool           `yaml:"isError"`
+	SpanType      string         `yaml:"spanType"`
+	Peer          string         `yaml:"Peer"`
+	PeerID        int32          `yaml:"peerId"`
+	Tags          []keyValuePair `yaml:"tags"`
+	Logs          []logEvent     `yaml:"logs"`
+	Refs          []segmentRef   `yaml:"refs"`
+}
+
+type segmentRef struct {
+	ParentEndpointID        int32  `yaml:"parentEndpointId"`
+	ParentEndpoint          string `yaml:"parentEndpoint"`
+	NetworkAddressID        int32  `yaml:"networkAddressId"`
+	EntryEndpointID         int32  `yaml:"entryEndpointId"`
+	RefType                 string `yaml:"refType"`
+	ParentSpanID            int32  `yaml:"parentSpanId"`
+	ParentTraceSegmentID    string `yaml:"parentTraceSegmentId"`
+	ParentServiceInstanceID int32  `yaml:"parentServiceInstanceId"`
+	NetworkAddress          string `yaml:"networkAddress"`
+	EntryEndpoint           string `yaml:"entryEndpoint"`
+	EntryServiceInstanceID  int32  `yaml:"entryServiceInstanceId"`
+}
+
+type keyValuePair struct {
+	Key   string `yaml:"key"`
+	Value string `yaml:"value"`
+}
+
+type logEvent struct {
+	LogEvent []keyValuePair `yaml:"logEvent"`
+}
+
+func RegistryApplication(applicationCode string, applicationId int32) {
+	if _, ok := ValidateDataInstance.RegistryItem.Applications[applicationCode]; !ok {
+		ValidateDataInstance.RegistryItem.Applications[applicationCode] = applicationId
+	}
+}
+
+func RegistryInstance(applicationId int32, instanceId int32) error {
+	applicationCode, err := ValidateDataInstance.RegistryItem.findApplicationCode(applicationId)
+	if err != nil {
+		return err
+	}
+
+	instances, _ := ValidateDataInstance.RegistryItem.InstanceMapping[applicationCode]
+	ValidateDataInstance.RegistryItem.InstanceMapping[applicationCode] = append(instances, instanceId)
+	return nil
+}
+
+func AddSpans(applicationID int32, instanceID int32, spans []go2sky.ReportedSpan) error {
+	return ValidateDataInstance.SegmentItems.addSegmentItem(applicationID, newSegment(instanceID, spans))
+}
+
+func newSegment(instanceID int32, spans []go2sky.ReportedSpan) (segment segment) {
 	spanSize := len(spans)
 	if spanSize < 1 {
 		return
 	}
 	rootSpan := spans[spanSize-1]
-	segment.SegmentId = rootSpan.Context().GetReadableGlobalTraceID()
+	segment.SegmentID = convert.GlobalIDConvertString(rootSpan.Context().TraceID)
 	segment.Spans = make([]span, spanSize)
 
 	for i, s := range spans {
 		spanCtx := s.Context()
 		segment.Spans[i] = span{
 			OperationName: s.OperationName(),
-			ParentSpanId:  spanCtx.ParentSpanID,
+			ParentSpanID:  spanCtx.ParentSpanID,
 			SpanId:        spanCtx.SpanID,
 			SpanLayer:     s.SpanLayer().String(),
 			StartTime:     s.StartTime(),
 			EndTime:       s.EndTime(),
-			ComponentId:   s.ComponentID(),
+			ComponentID:   s.ComponentID(),
 			IsError:       s.IsError(),
 			SpanType:      s.SpanType().String(),
 			Peer:          s.Peer(),
@@ -140,7 +195,7 @@ func NewSegment(spans []go2sky.ReportedSpan) (segment segment) {
 
 		// tags
 		if len(s.Tags()) > 0 {
-			var tags = make([]keyValuePair, len(s.Tags()))
+			var tags []keyValuePair
 			for _, tag := range s.Tags() {
 				tags = append(tags, keyValuePair{
 					Key:   tag.Key,
@@ -154,69 +209,35 @@ func NewSegment(spans []go2sky.ReportedSpan) (segment segment) {
 		srr := make([]segmentRef, 0)
 		if i == (spanSize-1) && spanCtx.ParentSpanID > -1 {
 			srr = append(srr, segmentRef{
-				ParentEndpointId:        0,
-				ParentEndpoint:          "",
-				NetworkAddressId:        0,
-				EntryEndpointId:         0,
-				RefType:                 "",
-				ParentSpanId:            spanCtx.ParentSpanID,
-				ParentTraceSegmentId:    spanCtx.ParentSegmentID,
-				ParentServiceInstanceId: 0,
-				NetworkAddress:          "",
-				EntryEndpoint:           "",
-				EntryServiceInstanceId:  0,
+				RefType:                 common.RefType_name[int32(common.RefType_CrossThread)],
+				ParentSpanID:            spanCtx.ParentSpanID,
+				ParentTraceSegmentID:    convert.GlobalIDConvertString(spanCtx.ParentSegmentID),
+				ParentServiceInstanceID: instanceID,
 			})
 		}
 		if len(s.Refs()) > 0 {
-
+			for _, tc := range s.Refs() {
+				srr = append(srr, segmentRef{
+					ParentSpanID:            tc.ParentSpanID,
+					ParentTraceSegmentID:    convert.GlobalIDConvertString(tc.ParentSegmentID),
+					ParentServiceInstanceID: tc.ParentServiceInstanceID,
+					EntryEndpoint:           tc.EntryEndpoint,
+					EntryEndpointID:         tc.EntryEndpointID,
+					EntryServiceInstanceID:  tc.EntryServiceInstanceID,
+					NetworkAddress:          tc.NetworkAddress,
+					NetworkAddressID:        tc.NetworkAddressID,
+					ParentEndpoint:          tc.ParentEndpoint,
+					ParentEndpointID:        tc.ParentEndpointID,
+					RefType:                 common.RefType_name[int32(common.RefType_CrossProcess)],
+				})
+			}
+			segment.Spans[i].Refs = srr
 		}
 	}
 	return
 }
 
-type segment struct {
-	SegmentId string `json:"segmentId"`
-	Spans     []span `json:"spans"`
-}
-
-type span struct {
-	OperationName string         `json:"operationName"`
-	OperationId   int32          `json:"operationId"`
-	ParentSpanId  int32          `json:"parentSpanId"`
-	SpanId        int32          `json:"spanId"`
-	SpanLayer     string         `json:"spanLayer"`
-	StartTime     int64          `json:"startTime"`
-	EndTime       int64          `json:"endTime"`
-	ComponentId   int32          `json:"componentId"`
-	ComponentName string         `json:"componentName"`
-	IsError       bool           `json:"isError"`
-	SpanType      string         `json:"spanType"`
-	Peer          string         `json:"Peer"`
-	PeerId        int32          `json:"peerId"`
-	Tags          []keyValuePair `json:"tags"`
-	Logs          []logEvent     `json:"logs"`
-	Refs          []segmentRef   `json:"refs"`
-}
-
-type segmentRef struct {
-	ParentEndpointId        int32  `json:"parentEndpointId"`
-	ParentEndpoint          string `json:"parentEndpoint"`
-	NetworkAddressId        int32  `json:"networkAddressId"`
-	EntryEndpointId         int32  `json:"entryEndpointId"`
-	RefType                 string `json:"refType"`
-	ParentSpanId            int32  `json:"parentSpanId"`
-	ParentTraceSegmentId    string `json:"parentTraceSegmentId"`
-	ParentServiceInstanceId int32  `json:"parentServiceInstanceId"`
-	NetworkAddress          string `json:"networkAddress"`
-	EntryEndpoint           string `json:"entryEndpoint"`
-	EntryServiceInstanceId  int32  `json:"entryServiceInstanceId"`
-}
-
-type keyValuePair struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
-type logEvent struct {
-	LogEvent []keyValuePair `json:"logEvent"`
+func ReceiveData() string {
+	data, _ := yaml.Marshal(ValidateDataInstance)
+	return string(data)
 }

@@ -15,21 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-package framework
+package convert
 
 import (
 	"fmt"
-	"testing"
+	"strings"
 )
 
-var (
-	instanceMap = make(map[string][]int32)
-)
-
-func TestRegis(t *testing.T) {
-	instances, _ := instanceMap["a"]
-	instances = append(instances, 1)
-	instanceMap["a"] = append(instances, 1)
-
-	fmt.Printf("instance: %v\n", instanceMap["a"])
+func GlobalIDConvertString(id []int64) string {
+	ii := make([]string, len(id))
+	for i, v := range id {
+		ii[i] = fmt.Sprint(v)
+	}
+	return strings.Join(ii, ".")
 }
