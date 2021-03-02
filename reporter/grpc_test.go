@@ -25,11 +25,12 @@ import (
 	"testing"
 	"time"
 
+	common "skywalking/network/common/v3"
+	agent "skywalking/network/language/agent/v3"
+	management "skywalking/network/management/v3"
+
 	"github.com/SkyAPM/go2sky"
 	"github.com/SkyAPM/go2sky/propagation"
-	"github.com/SkyAPM/go2sky/reporter/grpc/common"
-	v3 "github.com/SkyAPM/go2sky/reporter/grpc/language-agent"
-	managementv3 "github.com/SkyAPM/go2sky/reporter/grpc/management"
 	"github.com/SkyAPM/go2sky/reporter/grpc/management/mock_management"
 	"github.com/golang/mock/gomock"
 	"google.golang.org/grpc/credentials"
@@ -47,6 +48,8 @@ const (
 
 	mockService         = "service"
 	mockServiceInstance = "serviceInstance"
+
+	org = "SkyAPM"
 )
 
 var header string
@@ -67,7 +70,7 @@ func init() {
 
 func Test_e2e(t *testing.T) {
 	reporter := createGRPCReporter()
-	reporter.sendCh = make(chan *v3.SegmentObject, 10)
+	reporter.sendCh = make(chan *agent.SegmentObject, 10)
 	tracer, err := go2sky.NewTracer(mockService, go2sky.WithReporter(reporter), go2sky.WithInstance(mockServiceInstance))
 	if err != nil {
 		t.Error(err)
@@ -110,7 +113,7 @@ func Test_e2e(t *testing.T) {
 
 func TestGRPCReporter_Close(t *testing.T) {
 	reporter := createGRPCReporter()
-	reporter.sendCh = make(chan *v3.SegmentObject, 1)
+	reporter.sendCh = make(chan *agent.SegmentObject, 1)
 	tracer, err := go2sky.NewTracer(mockService, go2sky.WithReporter(reporter), go2sky.WithInstance(mockServiceInstance))
 	if err != nil {
 		t.Error(err)
@@ -129,7 +132,7 @@ func TestGRPCReporter_Close(t *testing.T) {
 func TestGRPCReporterOption(t *testing.T) {
 	// props
 	instanceProps := make(map[string]string)
-	instanceProps["org"] = "SkyAPM"
+	instanceProps["org"] = org
 
 	// log
 	logger := log.New(os.Stderr, "WithLogger", log.LstdFlags)
@@ -172,7 +175,7 @@ func TestGRPCReporterOption(t *testing.T) {
 				if value, ok = reporter.instanceProps["org"]; !ok {
 					t.Error("error are not set instanceProps")
 				}
-				if value != "SkyAPM" {
+				if value != org {
 					t.Error("error are not set instanceProps")
 				}
 			},
@@ -217,7 +220,7 @@ func TestGRPCReporterOption(t *testing.T) {
 
 func TestGRPCReporter_reportInstanceProperties(t *testing.T) {
 	customProps := make(map[string]string)
-	customProps["org"] = "SkyAPM"
+	customProps["org"] = org
 	osProps := buildOSInfo()
 	for k, v := range customProps {
 		osProps = append(osProps, &common.KeyStringValuePair{
@@ -225,7 +228,7 @@ func TestGRPCReporter_reportInstanceProperties(t *testing.T) {
 			Value: v,
 		})
 	}
-	instanceProperties := &managementv3.InstanceProperties{
+	instanceProperties := &management.InstanceProperties{
 		Service:         mockService,
 		ServiceInstance: mockServiceInstance,
 		Properties:      osProps,
@@ -254,13 +257,13 @@ func createGRPCReporter() *gRPCReporter {
 }
 
 type instancePropertiesMatcher struct {
-	x *managementv3.InstanceProperties
+	x *management.InstanceProperties
 }
 
 func (e instancePropertiesMatcher) Matches(x interface{}) bool {
-	var props *managementv3.InstanceProperties
+	var props *management.InstanceProperties
 	var ok bool
-	if props, ok = x.(*managementv3.InstanceProperties); !ok {
+	if props, ok = x.(*management.InstanceProperties); !ok {
 		return ok
 	}
 	if props.Service != e.x.Service {

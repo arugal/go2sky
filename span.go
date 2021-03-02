@@ -23,8 +23,9 @@ import (
 
 	"github.com/SkyAPM/go2sky/internal/tool"
 	"github.com/SkyAPM/go2sky/propagation"
-	"github.com/SkyAPM/go2sky/reporter/grpc/common"
-	v3 "github.com/SkyAPM/go2sky/reporter/grpc/language-agent"
+
+	common "skywalking/network/common/v3"
+	agent "skywalking/network/language/agent/v3"
 )
 
 // SpanType is used to identify entry, exit and local
@@ -44,7 +45,7 @@ type Span interface {
 	SetOperationName(string)
 	GetOperationName() string
 	SetPeer(string)
-	SetSpanLayer(v3.SpanLayer)
+	SetSpanLayer(agent.SpanLayer)
 	SetComponent(int32)
 	Tag(Tag, string)
 	Log(time.Time, ...string)
@@ -69,10 +70,10 @@ type defaultSpan struct {
 	EndTime       time.Time
 	OperationName string
 	Peer          string
-	Layer         v3.SpanLayer
+	Layer         agent.SpanLayer
 	ComponentID   int32
 	Tags          []*common.KeyStringValuePair
-	Logs          []*v3.Log
+	Logs          []*agent.Log
 	IsError       bool
 	SpanType      SpanType
 }
@@ -90,7 +91,7 @@ func (ds *defaultSpan) SetPeer(peer string) {
 	ds.Peer = peer
 }
 
-func (ds *defaultSpan) SetSpanLayer(layer v3.SpanLayer) {
+func (ds *defaultSpan) SetSpanLayer(layer agent.SpanLayer) {
 	ds.Layer = layer
 }
 
@@ -102,7 +103,7 @@ func (ds *defaultSpan) Tag(key Tag, value string) {
 	ds.Tags = append(ds.Tags, &common.KeyStringValuePair{Key: string(key), Value: value})
 }
 
-func (ds *defaultSpan) Log(time time.Time, ll ...string) {
+func (ds *defaultSpan) Log(now time.Time, ll ...string) {
 	data := make([]*common.KeyStringValuePair, 0, int32(math.Ceil(float64(len(ll))/2.0)))
 	var kvp *common.KeyStringValuePair
 	for i, l := range ll {
@@ -110,18 +111,16 @@ func (ds *defaultSpan) Log(time time.Time, ll ...string) {
 			kvp = &common.KeyStringValuePair{}
 			data = append(data, kvp)
 			kvp.Key = l
-		} else {
-			if kvp != nil {
-				kvp.Value = l
-			}
+		} else if kvp != nil {
+			kvp.Value = l
 		}
 	}
-	ds.Logs = append(ds.Logs, &v3.Log{Time: tool.Millisecond(time), Data: data})
+	ds.Logs = append(ds.Logs, &agent.Log{Time: tool.Millisecond(now), Data: data})
 }
 
-func (ds *defaultSpan) Error(time time.Time, ll ...string) {
+func (ds *defaultSpan) Error(now time.Time, ll ...string) {
 	ds.IsError = true
-	ds.Log(time, ll...)
+	ds.Log(now, ll...)
 }
 
 func (ds *defaultSpan) End() {
@@ -136,7 +135,7 @@ func (ds *defaultSpan) IsExit() bool {
 	return ds.SpanType == SpanTypeExit
 }
 
-// SpanOption allows for functional options to adjust behaviour
+// SpanOption allows for functional options to adjust behavior
 // of a Span to be created by CreateLocalSpan
 type SpanOption func(s *defaultSpan)
 

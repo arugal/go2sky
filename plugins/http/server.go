@@ -23,10 +23,11 @@ import (
 	"strconv"
 	"time"
 
+	agent "skywalking/network/language/agent/v3"
+
 	"github.com/SkyAPM/go2sky"
 	"github.com/SkyAPM/go2sky/internal/tool"
 	"github.com/SkyAPM/go2sky/propagation"
-	v3 "github.com/SkyAPM/go2sky/reporter/grpc/language-agent"
 )
 
 const (
@@ -46,7 +47,7 @@ type handler struct {
 type ServerOption func(*handler)
 
 // Tag adds extra tag to server spans.
-func WithServerTag(key string, value string) ServerOption {
+func WithServerTag(key, value string) ServerOption {
 	return func(h *handler) {
 		if h.extraTags == nil {
 			h.extraTags = make(map[string]string)
@@ -96,7 +97,7 @@ func (h handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	span.Tag(go2sky.TagHTTPMethod, r.Method)
 	span.Tag(go2sky.TagURL, fmt.Sprintf("%s%s", r.Host, r.URL.Path))
-	span.SetSpanLayer(v3.SpanLayer_Http)
+	span.SetSpanLayer(agent.SpanLayer_Http)
 
 	rww := &responseWriterWrapper{w: w, statusCode: 200}
 	defer func() {

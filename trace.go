@@ -21,10 +21,9 @@ import (
 	"context"
 
 	"github.com/SkyAPM/go2sky/internal/idgen"
-	"github.com/pkg/errors"
-
 	"github.com/SkyAPM/go2sky/internal/tool"
 	"github.com/SkyAPM/go2sky/propagation"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -43,7 +42,7 @@ type Tracer struct {
 	sampler  Sampler
 }
 
-// TracerOption allows for functional options to adjust behaviour
+// TracerOption allows for functional options to adjust behavior
 // of a Tracer to be created by NewTracer
 type TracerOption func(t *Tracer)
 
@@ -140,7 +139,7 @@ func (t *Tracer) CreateLocalSpan(ctx context.Context, opts ...SpanOption) (s Spa
 }
 
 // CreateExitSpan creates and starts an exit span for client
-func (t *Tracer) CreateExitSpan(ctx context.Context, operationName string, peer string, injector propagation.Injector) (Span, error) {
+func (t *Tracer) CreateExitSpan(ctx context.Context, operationName, peer string, injector propagation.Injector) (Span, error) {
 	if ctx == nil || operationName == "" || peer == "" || injector == nil {
 		return nil, errParameter
 	}
@@ -198,7 +197,7 @@ type ctxKey struct{}
 
 var ctxKeyInstance = ctxKey{}
 
-//Reporter is a data transit specification
+// Reporter is a data transit specification
 type Reporter interface {
 	Boot(service string, serviceInstance string)
 	Send(spans []ReportedSpan)

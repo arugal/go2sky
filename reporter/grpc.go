@@ -24,11 +24,12 @@ import (
 	"os"
 	"time"
 
+	common "skywalking/network/common/v3"
+	agent "skywalking/network/language/agent/v3"
+	management "skywalking/network/management/v3"
+
 	"github.com/SkyAPM/go2sky"
 	"github.com/SkyAPM/go2sky/internal/tool"
-	"github.com/SkyAPM/go2sky/reporter/grpc/common"
-	agentv3 "github.com/SkyAPM/go2sky/reporter/grpc/language-agent"
-	managementv3 "github.com/SkyAPM/go2sky/reporter/grpc/management"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
@@ -46,7 +47,7 @@ const (
 func NewGRPCReporter(serverAddr string, opts ...GRPCReporterOption) (go2sky.Reporter, error) {
 	r := &gRPCReporter{
 		logger:        log.New(os.Stderr, defaultLogPrefix, log.LstdFlags),
-		sendCh:        make(chan *agentv3.SegmentObject, maxSendQueueSize),
+		sendCh:        make(chan *agent.SegmentObject, maxSendQueueSize),
 		checkInterval: defaultCheckInterval,
 	}
 	for _, o := range opts {
@@ -66,12 +67,12 @@ func NewGRPCReporter(serverAddr string, opts ...GRPCReporterOption) (go2sky.Repo
 		return nil, err
 	}
 	r.conn = conn
-	r.traceClient = agentv3.NewTraceSegmentReportServiceClient(r.conn)
-	r.managementClient = managementv3.NewManagementServiceClient(r.conn)
+	r.traceClient = agent.NewTraceSegmentReportServiceClient(r.conn)
+	r.managementClient = management.NewManagementServiceClient(r.conn)
 	return r, nil
 }
 
-// GRPCReporterOption allows for functional options to adjust behaviour
+// GRPCReporterOption allows for functional options to adjust behavior
 // of a gRPC reporter to be created by NewGRPCReporter
 type GRPCReporterOption func(r *gRPCReporter)
 
@@ -92,7 +93,7 @@ func WithCheckInterval(interval time.Duration) GRPCReporterOption {
 // WithMaxSendQueueSize setup send span queue buffer length
 func WithMaxSendQueueSize(maxSendQueueSize int) GRPCReporterOption {
 	return func(r *gRPCReporter) {
-		r.sendCh = make(chan *agentv3.SegmentObject, maxSendQueueSize)
+		r.sendCh = make(chan *agent.SegmentObject, maxSendQueueSize)
 	}
 }
 
@@ -122,17 +123,17 @@ type gRPCReporter struct {
 	serviceInstance  string
 	instanceProps    map[string]string
 	logger           *log.Logger
-	sendCh           chan *agentv3.SegmentObject
+	sendCh           chan *agent.SegmentObject
 	conn             *grpc.ClientConn
-	traceClient      agentv3.TraceSegmentReportServiceClient
-	managementClient managementv3.ManagementServiceClient
+	traceClient      agent.TraceSegmentReportServiceClient
+	managementClient management.ManagementServiceClient
 	checkInterval    time.Duration
 
 	md    metadata.MD
 	creds credentials.TransportCredentials
 }
 
-func (r *gRPCReporter) Boot(service string, serviceInstance string) {
+func (r *gRPCReporter) Boot(service, serviceInstance string) {
 	r.service = service
 	r.serviceInstance = serviceInstance
 	r.initSendPipeline()
@@ -146,16 +147,16 @@ func (r *gRPCReporter) Send(spans []go2sky.ReportedSpan) {
 	}
 	rootSpan := spans[spanSize-1]
 	rootCtx := rootSpan.Context()
-	segmentObject := &agentv3.SegmentObject{
+	segmentObject := &agent.SegmentObject{
 		TraceId:         rootCtx.TraceID,
 		TraceSegmentId:  rootCtx.SegmentID,
-		Spans:           make([]*agentv3.SpanObject, spanSize),
+		Spans:           make([]*agent.SpanObject, spanSize),
 		Service:         r.service,
 		ServiceInstance: r.serviceInstance,
 	}
 	for i, s := range spans {
 		spanCtx := s.Context()
-		segmentObject.Spans[i] = &agentv3.SpanObject{
+		segmentObject.Spans[i] = &agent.SpanObject{
 			SpanId:        spanCtx.SpanID,
 			ParentSpanId:  spanCtx.ParentSpanID,
 			StartTime:     s.StartTime(),
@@ -169,10 +170,10 @@ func (r *gRPCReporter) Send(spans []go2sky.ReportedSpan) {
 			Tags:          s.Tags(),
 			Logs:          s.Logs(),
 		}
-		srr := make([]*agentv3.SegmentReference, 0)
+		srr := make([]*agent.SegmentReference, 0)
 		if i == (spanSize-1) && spanCtx.ParentSpanID > -1 {
-			srr = append(srr, &agentv3.SegmentReference{
-				RefType:               agentv3.RefType_CrossThread,
+			srr = append(srr, &agent.SegmentReference{
+				RefType:               agent.RefType_CrossThread,
 				TraceId:               spanCtx.TraceID,
 				ParentTraceSegmentId:  spanCtx.ParentSegmentID,
 				ParentSpanId:          spanCtx.ParentSpanID,
@@ -182,8 +183,8 @@ func (r *gRPCReporter) Send(spans []go2sky.ReportedSpan) {
 		}
 		if len(s.Refs()) > 0 {
 			for _, tc := range s.Refs() {
-				srr = append(srr, &agentv3.SegmentReference{
-					RefType:                  agentv3.RefType_CrossProcess,
+				srr = append(srr, &agent.SegmentReference{
+					RefType:                  agent.RefType_CrossProcess,
 					TraceId:                  spanCtx.TraceID,
 					ParentTraceSegmentId:     tc.ParentSegmentID,
 					ParentSpanId:             tc.ParentSpanID,
@@ -252,7 +253,7 @@ func (r *gRPCReporter) initSendPipeline() {
 	}()
 }
 
-func (r *gRPCReporter) closeStream(stream agentv3.TraceSegmentReportService_CollectClient) {
+func (r *gRPCReporter) closeStream(stream agent.TraceSegmentReportService_CollectClient) {
 	_, err := stream.CloseAndRecv()
 	if err != nil && err != io.EOF {
 		r.logger.Printf("send closing error %v", err)
@@ -269,7 +270,7 @@ func (r *gRPCReporter) reportInstanceProperties() (err error) {
 			})
 		}
 	}
-	_, err = r.managementClient.ReportInstanceProperties(metadata.NewOutgoingContext(context.Background(), r.md), &managementv3.InstanceProperties{
+	_, err = r.managementClient.ReportInstanceProperties(metadata.NewOutgoingContext(context.Background(), r.md), &management.InstanceProperties{
 		Service:         r.service,
 		ServiceInstance: r.serviceInstance,
 		Properties:      props,
@@ -298,7 +299,7 @@ func (r *gRPCReporter) check() {
 				instancePropertiesSubmitted = true
 			}
 
-			_, err := r.managementClient.KeepAlive(metadata.NewOutgoingContext(context.Background(), r.md), &managementv3.InstancePingPkg{
+			_, err := r.managementClient.KeepAlive(metadata.NewOutgoingContext(context.Background(), r.md), &management.InstancePingPkg{
 				Service:         r.service,
 				ServiceInstance: r.serviceInstance,
 			})
@@ -349,5 +350,5 @@ func buildOSInfo() (props []*common.KeyStringValuePair) {
 			props = append(props, kv)
 		}
 	}
-	return
+	return props
 }

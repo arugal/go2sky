@@ -33,6 +33,7 @@ var (
 
 func oldGenerateGlobalID() string {
 	seededIDLock.Lock()
+
 	seededID := seededIDGen.Int63()
 	seededIDLock.Unlock()
 	id := []int64{time.Now().UnixNano(), 0, seededID}

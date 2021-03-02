@@ -29,6 +29,8 @@ deps:
 test:
 	go test -v -race -cover -coverprofile=coverage.txt -covermode=atomic `go list ./... | grep -v github.com/SkyAPM/go2sky/reporter/grpc | grep -v github.com/SkyAPM/go2sky/test`
 
+
+
 .PHONY: proto-gen
 proto-gen:
 	cd $(GRPC_PATH) && \
@@ -52,7 +54,7 @@ mock-gen:
 
 LINTER := bin/golangci-lint
 $(LINTER):
-	wget -q -O- https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.20.1
+	wget -q -O- https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s v1.37.1
 
 .PHONY: lint
 lint: $(LINTER) ./golangci.yml  ## Run the linters

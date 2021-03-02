@@ -168,7 +168,7 @@ type NoopReporter struct {
 	Spans []ReportedSpan
 }
 
-func (*NoopReporter) Boot(service string, serviceInstance string) {
+func (*NoopReporter) Boot(service, serviceInstance string) {
 }
 
 func (r *NoopReporter) Send(spans []ReportedSpan) {

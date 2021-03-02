@@ -22,9 +22,10 @@ import (
 	"strconv"
 	"time"
 
+	agent "skywalking/network/language/agent/v3"
+
 	"github.com/SkyAPM/go2sky"
 	"github.com/SkyAPM/go2sky/propagation"
-	v3 "github.com/SkyAPM/go2sky/reporter/grpc/language-agent"
 )
 
 const componentIDGOHttpClient = 5005
@@ -47,7 +48,7 @@ func WithClientOperationName(name string) ClientOption {
 }
 
 // WithClientTag adds extra tag to client spans.
-func WithClientTag(key string, value string) ClientOption {
+func WithClientTag(key, value string) ClientOption {
 	return func(c *ClientConfig) {
 		if c.extraTags == nil {
 			c.extraTags = make(map[string]string)
@@ -106,7 +107,7 @@ func (t *transport) RoundTrip(req *http.Request) (res *http.Response, err error)
 	}
 	span.Tag(go2sky.TagHTTPMethod, req.Method)
 	span.Tag(go2sky.TagURL, req.URL.String())
-	span.SetSpanLayer(v3.SpanLayer_Http)
+	span.SetSpanLayer(agent.SpanLayer_Http)
 	res, err = t.delegated.RoundTrip(req)
 	if err != nil {
 		span.Error(time.Now(), err.Error())

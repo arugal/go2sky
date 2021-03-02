@@ -20,11 +20,12 @@ package go2sky
 import (
 	"sync/atomic"
 
+	common "skywalking/network/common/v3"
+	agent "skywalking/network/language/agent/v3"
+
 	"github.com/SkyAPM/go2sky/internal/idgen"
 	"github.com/SkyAPM/go2sky/internal/tool"
 	"github.com/SkyAPM/go2sky/propagation"
-	"github.com/SkyAPM/go2sky/reporter/grpc/common"
-	v3 "github.com/SkyAPM/go2sky/reporter/grpc/language-agent"
 )
 
 func newSegmentSpan(defaultSpan *defaultSpan, parentSpan segmentSpan) (s segmentSpan, err error) {
@@ -69,11 +70,11 @@ type ReportedSpan interface {
 	EndTime() int64
 	OperationName() string
 	Peer() string
-	SpanType() v3.SpanType
-	SpanLayer() v3.SpanLayer
+	SpanType() agent.SpanType
+	SpanLayer() agent.SpanLayer
 	IsError() bool
 	Tags() []*common.KeyStringValuePair
-	Logs() []*v3.Log
+	Logs() []*agent.Log
 	ComponentID() int32
 }
 
@@ -122,11 +123,11 @@ func (s *segmentSpanImpl) Peer() string {
 	return s.defaultSpan.Peer
 }
 
-func (s *segmentSpanImpl) SpanType() v3.SpanType {
-	return v3.SpanType(s.defaultSpan.SpanType)
+func (s *segmentSpanImpl) SpanType() agent.SpanType {
+	return agent.SpanType(s.defaultSpan.SpanType)
 }
 
-func (s *segmentSpanImpl) SpanLayer() v3.SpanLayer {
+func (s *segmentSpanImpl) SpanLayer() agent.SpanLayer {
 	return s.defaultSpan.Layer
 }
 
@@ -138,7 +139,7 @@ func (s *segmentSpanImpl) Tags() []*common.KeyStringValuePair {
 	return s.defaultSpan.Tags
 }
 
-func (s *segmentSpanImpl) Logs() []*v3.Log {
+func (s *segmentSpanImpl) Logs() []*agent.Log {
 	return s.defaultSpan.Logs
 }
 
@@ -199,7 +200,7 @@ func (rs *rootSegmentSpan) End() {
 	}()
 }
 
-func (rs *rootSegmentSpan) createRootSegmentContext(parent segmentSpan) (err error) {
+func (rs *rootSegmentSpan) createRootSegmentContext(_ segmentSpan) (err error) {
 	rs.SegmentID, err = idgen.GenerateGlobalID()
 	if err != nil {
 		return err
